@@ -198,23 +198,25 @@ MPSCQueueTryPop(cqueue_mpsc_t *mpsc, void **elem_out)
 bool
 MPSCQueueIsEmpty(cqueue_mpsc_t *mpsc)
 {
-	if (queue_is_empty(atomic_load(&mpsc->last_head), atomic_load(&mpsc->tail)))
+	if (queue_is_empty(LOAD_ACQUIRE(&mpsc->last_head), LOAD_ACQUIRE(&mpsc->tail)))
 		update_last_head(mpsc);
 	else
 		return false;
 
-	return queue_is_empty(atomic_load(&mpsc->last_head), atomic_load(&mpsc->tail));
+	return queue_is_empty(LOAD_ACQUIRE(&mpsc->last_head), LOAD_ACQUIRE(&mpsc->tail));
 }
 
 bool
 MPSCQueueIsFull(cqueue_mpsc_t *mpsc)
 {
-	if (queue_is_full(atomic_load(&mpsc->head), atomic_load(&mpsc->last_tail), mpsc->queue_size))
+	if (queue_is_full(LOAD_ACQUIRE(&mpsc->head), LOAD_ACQUIRE(&mpsc->last_tail), mpsc->queue_size))
 		update_last_tail(mpsc);
 	else
 		return false;
 
-	return queue_is_full(atomic_load(&mpsc->head), atomic_load(&mpsc->last_tail), mpsc->queue_size);
+	return queue_is_full(LOAD_ACQUIRE(&mpsc->head),
+	                     LOAD_ACQUIRE(&mpsc->last_tail),
+	                     mpsc->queue_size);
 }
 
 static bool
