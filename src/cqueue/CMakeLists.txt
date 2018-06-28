@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(cqueue C)
 
 set(CMAKE_C_STANDARD 11)
-set(SOURCE_FILES cqueue.h cqueue.hpp mpmc.c)
+set(SOURCE_FILES cqueue.h mpmc.c)
 
 add_library(cqueue SHARED ${SOURCE_FILES})
 
@@ -12,4 +12,4 @@ include_directories(wait_event backoff)
 target_link_libraries(cqueue wait_event backoff)
 
 install(TARGETS cqueue DESTINATION lib)
-install(FILES cqueue.h cqueue.hpp DESTINATION include/cqueue)
+install(FILES cqueue.h DESTINATION include/cqueue)
