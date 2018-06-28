@@ -56,17 +56,17 @@ WaitEventNumWaiters(wait_event_t *wevent)
 int
 WaitEventTimedWait(wait_event_t *wevent,
                    wait_event_predicate_t predicate,
-                   void *pred_arg,
+                   const void *pred_arg,
                    const struct timespec *abstime)
 {
-	if (predicate(pred_arg))
+	if (!predicate(pred_arg))
 	{
 		inc_waiter_count(wevent);
 
 		if (pthread_mutex_lock(&wevent->mutex))
 			return -1;
 
-		while (predicate(pred_arg))
+		while (!predicate(pred_arg))
 		{
 			if (pthread_cond_timedwait(&wevent->cond, &wevent->mutex, abstime))
 				return -1;

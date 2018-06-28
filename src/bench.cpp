@@ -5,7 +5,7 @@
 #include <thread>
 #include <vector>
 
-#include "cqueue.hpp"
+#include "mpsc_queue.hpp"
 
 #define as_ptr(x) (reinterpret_cast<void *>(x))
 #define as_int(x) (reinterpret_cast<uintptr_t>(x))
@@ -18,9 +18,17 @@ cqueue_consume_worker(cqueue_t &mpsc,
                       std::atomic_int &num_consumed,
                       int total_items)
 {
-	using namespace std::chrono_literals;
 	int num_times_waited = 0;
 	int local_consumed   = 0;
+
+	using namespace std::literals::chrono_literals;
+
+	auto pred = [&num_consumed, total_items, &mpsc]() {
+		if (num_consumed >= total_items)
+			return true;
+
+		return !mpsc.is_empty();
+	};
 
 	while (num_consumed < total_items)
 	{
@@ -29,16 +37,21 @@ cqueue_consume_worker(cqueue_t &mpsc,
 		if (mpsc.try_pop(elem))
 		{
 			out.emplace_back(as_int(elem));
+			mpsc.wakeup_one_producer();
 			local_consumed++;
 		}
 		else
 		{
 			num_consumed += local_consumed;
 			local_consumed = 0;
+
+			mpsc.consumer_wait(pred);
 			num_times_waited++;
-			std::this_thread::sleep_for(10us);
 		}
 	}
+
+	mpsc.wakeup_all_producers();
+	mpsc.wakeup_all_consumers();
 
 	m.lock();
 	std::cout << "Consumer Num times waited: " << num_times_waited << std::endl;
@@ -48,17 +61,24 @@ cqueue_consume_worker(cqueue_t &mpsc,
 static void
 cqueue_produce_worker(cqueue_t &mpsc, std::vector<uintptr_t> &in)
 {
-	using namespace std::chrono_literals;
 	int num_times_waited = 0;
+
+	using namespace std::literals::chrono_literals;
+
+	auto pred = [&mpsc]() { return !mpsc.is_full(); };
 
 	for (auto &elem : in)
 	{
 		while (!mpsc.try_push(as_ptr(elem)))
 		{
+			mpsc.producer_wait(pred);
 			num_times_waited++;
-			std::this_thread::sleep_for(10us);
 		}
+
+		mpsc.wakeup_one_consumer();
 	}
+
+	mpsc.wakeup_all_consumers();
 
 	m.lock();
 	std::cout << "Produer Num times waited: " << num_times_waited << std::endl;

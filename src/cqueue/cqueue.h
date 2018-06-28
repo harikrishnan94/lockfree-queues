@@ -7,8 +7,6 @@ extern "C"
 #endif // __cplusplus
 
 #include <stdbool.h>
-#include <stddef.h>
-#include <time.h>
 
 	/******** MPSC Queue *********/
 	struct cqueue_mpsc_s;

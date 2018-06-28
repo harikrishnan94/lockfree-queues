@@ -12,8 +12,8 @@ extern "C"
 	struct wait_event_s;
 	typedef struct wait_event_s wait_event_t;
 
-	/********* Return true to wait *********/
-	typedef bool (*wait_event_predicate_t)(void *arg);
+	/********* Return false to wait *********/
+	typedef bool (*wait_event_predicate_t)(const void *arg);
 
 	extern wait_event_t *CreateWaitEvent(void);
 	extern void DestroyWaitEvent(wait_event_t *);
@@ -23,7 +23,7 @@ extern "C"
 
 	extern int WaitEventTimedWait(wait_event_t *wevent,
 	                              wait_event_predicate_t predicate,
-	                              void *pred_arg,
+	                              const void *pred_arg,
 	                              const struct timespec *abstime);
 	extern int WaitEventNumWaiters(wait_event_t *wevent);
 	extern int WaitEventWakeupOneWaiter(wait_event_t *wevent);
