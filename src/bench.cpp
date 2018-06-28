@@ -20,6 +20,7 @@ cqueue_consume_worker(cqueue_t &mpsc,
 {
 	using namespace std::chrono_literals;
 	int num_times_waited = 0;
+	int local_consumed   = 0;
 
 	while (num_consumed < total_items)
 	{
@@ -28,10 +29,12 @@ cqueue_consume_worker(cqueue_t &mpsc,
 		if (mpsc.try_pop(elem))
 		{
 			out.emplace_back(as_int(elem));
-			num_consumed++;
+			local_consumed++;
 		}
 		else
 		{
+			num_consumed += local_consumed;
+			local_consumed = 0;
 			num_times_waited++;
 			std::this_thread::sleep_for(10us);
 		}
