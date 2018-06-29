@@ -96,8 +96,8 @@ private:
 	static bool
 	predicate_apply(const void *arg)
 	{
-		auto *predicate = static_cast<const std::function<int()> *>(arg);
+		auto &predicate = *static_cast<const std::function<int()> *>(arg);
 
-		return (*predicate)();
+		return predicate();
 	}
 };
