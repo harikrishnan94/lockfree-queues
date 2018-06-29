@@ -21,9 +21,9 @@
 			"request": "launch",
 			"program": "${workspaceFolder}/build/src/cqueue_bench",
 			"args": [
-				"100",
-				"1000000",
-				"1",
+				"mpsc",
+				"36",
+				"3",
 				"1",
 				"1"
 			],

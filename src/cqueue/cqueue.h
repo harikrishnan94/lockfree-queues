@@ -7,6 +7,7 @@ extern "C"
 #endif // __cplusplus
 
 #include <stdbool.h>
+#include <stddef.h>
 
 	/******** MPMC Queue *********/
 	struct cqueue_mpmc_s;
@@ -20,6 +21,25 @@ extern "C"
 
 	extern bool MPMCQueueIsEmpty(cqueue_mpmc_t *mpmc);
 	extern bool MPMCQueueIsFull(cqueue_mpmc_t *mpmc);
+
+	/******** Multi-Process aware - MPSC Queue *********/
+	struct shmem_mpsc_queue_s;
+	typedef struct shmem_mpsc_queue_s shmem_mpsc_queue_t;
+
+	extern size_t CalculateMPSCQueueSize(size_t queue_size, int max_producers);
+	extern void InitializeMPSCQueue(shmem_mpsc_queue_t *mpsc, size_t queue_size, int max_producers);
+	extern shmem_mpsc_queue_t *CreateMPSCQueue(size_t queue_size, int max_producers);
+	extern void DestroyMPSCQueue(shmem_mpsc_queue_t *mpsc);
+
+	extern bool MPSCQueueTryPush(shmem_mpsc_queue_t *mpsc,
+	                             int producer_id,
+	                             void *elem,
+	                             int elem_size);
+	extern int MPSCQueueNextElemSize(shmem_mpsc_queue_t *mpsc);
+	extern bool MPSCQueuePop(shmem_mpsc_queue_t *mpsc, void *elem);
+
+	extern bool MPSCQueueIsEmpty(shmem_mpsc_queue_t *mpsc);
+	extern bool MPSCQueueIsFull(shmem_mpsc_queue_t *mpsc, int elem_size);
 
 #ifdef __cplusplus
 }

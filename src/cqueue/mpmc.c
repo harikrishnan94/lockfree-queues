@@ -10,8 +10,6 @@
 #include <string.h>
 #include <unistd.h>
 
-typedef _Atomic(void *) atomic_pointer;
-
 #define __CACHE_ALIGN__ _Alignas(64)
 
 struct thread_pos_t
@@ -22,7 +20,7 @@ struct thread_pos_t
 
 struct cqueue_mpmc_s
 {
-	atomic_pointer *queue_data;
+	void **queue_data;
 	int queue_size;
 	int max_threads;
 
@@ -52,7 +50,7 @@ CreateMPMCQueue(int queue_size, int max_threads)
 {
 	cqueue_mpmc_t *mpmc = malloc(sizeof(struct cqueue_mpmc_s));
 
-	mpmc->queue_data  = malloc(sizeof(atomic_pointer) * queue_size);
+	mpmc->queue_data  = malloc(sizeof(void *) * queue_size);
 	mpmc->queue_size  = queue_size;
 	mpmc->max_threads = max_threads;
 	mpmc->tpos        = malloc(sizeof(struct thread_pos_t) * max_threads);
@@ -169,8 +167,8 @@ MPMCQueueTryPush(cqueue_mpmc_t *mpmc, void *elem)
 
 	if (head >= 0)
 	{
-		did_push = true;
-		STORE_RELAXED(mpmc->queue_data + head % mpmc->queue_size, elem);
+		did_push                                  = true;
+		mpmc->queue_data[head % mpmc->queue_size] = elem;
 	}
 
 	SET_HEAD_POS(mpmc, LONG_MAX);
@@ -187,7 +185,7 @@ MPMCQueueTryPop(cqueue_mpmc_t *mpmc, void **elem_out)
 	if (tail >= 0)
 	{
 		did_pop   = true;
-		*elem_out = LOAD_RELAXED(mpmc->queue_data + tail % mpmc->queue_size);
+		*elem_out = mpmc->queue_data[tail % mpmc->queue_size];
 	}
 
 	SET_TAIL_POS(mpmc, LONG_MAX);

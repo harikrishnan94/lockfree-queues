@@ -32,7 +32,7 @@ InitializeWaitEvent(wait_event_t *wevent, int pshared)
 	atomic_init(&wevent->waiters, 0);
 
 	if (pthread_mutexattr_init(&mattr))
-		goto fail_after_alloc;
+		return false;
 
 	if (pthread_condattr_init(&cattr))
 		goto fail_after_mattr_init;
@@ -49,8 +49,6 @@ InitializeWaitEvent(wait_event_t *wevent, int pshared)
 
 	return false;
 
-fail_after_alloc:
-	free(wevent);
 fail_after_mattr_init:
 	pthread_mutexattr_destroy(&mattr);
 fail_after_cattr_init:
@@ -68,10 +66,11 @@ CreateWaitEvent(void)
 
 	if (wevent)
 	{
-		wevent->free_mem = true;
-
 		if (!InitializeWaitEvent(wevent, PTHREAD_PROCESS_PRIVATE))
+		{
+			wevent->free_mem = true;
 			return wevent;
+		}
 
 		free(wevent);
 	}

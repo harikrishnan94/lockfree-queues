@@ -3,7 +3,7 @@ project(cqueue_bench)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(SOURCE_FILES mpmc_queue.hpp bench.cpp)
+set(SOURCE_FILES mpmc_queue.hpp mpsc_shmem_queue.hpp mpmc_bench.cpp mpsc_bench.cpp bench.cpp)
 
 add_subdirectory(cqueue)
 
