@@ -15,6 +15,9 @@ extern "C"
 	/********* Return false to wait *********/
 	typedef bool (*wait_event_predicate_t)(const void *arg);
 
+	extern int WaitEventStructSize(void);
+	// pshared must be one of PTHREAD_PROCESS_PRIVATE or PTHREAD_PROCESS_SHARED
+	extern bool InitializeWaitEvent(wait_event_t *, int pshared);
 	extern wait_event_t *CreateWaitEvent(void);
 	extern void DestroyWaitEvent(wait_event_t *);
 

@@ -7,6 +7,7 @@
 struct wait_event_s
 {
 	atomic_int waiters;
+	bool free_mem;
 
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
@@ -16,25 +17,64 @@ struct wait_event_s
 #define inc_waiter_count(wevent) (atomic_fetch_add(&wevent->waiters, 1))
 #define dec_waiter_count(wevent) (atomic_fetch_sub(&wevent->waiters, 1))
 
+int
+WaitEventStructSize(void)
+{
+	return sizeof(wait_event_t);
+}
+
+bool
+InitializeWaitEvent(wait_event_t *wevent, int pshared)
+{
+	pthread_mutexattr_t mattr;
+	pthread_condattr_t cattr;
+
+	atomic_init(&wevent->waiters, 0);
+
+	if (pthread_mutexattr_init(&mattr))
+		goto fail_after_alloc;
+
+	if (pthread_condattr_init(&cattr))
+		goto fail_after_mattr_init;
+
+	if (pthread_mutexattr_setpshared(&mattr, pshared)
+	    || pthread_condattr_setpshared(&cattr, pshared))
+		goto fail_after_cattr_init;
+
+	if (pthread_mutex_init(&wevent->mutex, &mattr))
+		goto fail_after_cattr_init;
+
+	if (pthread_cond_init(&wevent->cond, &cattr))
+		goto fail_after_mutex_init;
+
+	return false;
+
+fail_after_alloc:
+	free(wevent);
+fail_after_mattr_init:
+	pthread_mutexattr_destroy(&mattr);
+fail_after_cattr_init:
+	pthread_condattr_destroy(&cattr);
+fail_after_mutex_init:
+	pthread_mutex_destroy(&wevent->mutex);
+
+	return true;
+}
+
 wait_event_t *
 CreateWaitEvent(void)
 {
 	wait_event_t *wevent = malloc(sizeof(struct wait_event_s));
 
-	atomic_init(&wevent->waiters, 0);
+	if (wevent)
+	{
+		wevent->free_mem = true;
 
-	if (pthread_mutex_init(&wevent->mutex, NULL))
-		goto fail_after_alloc;
+		if (!InitializeWaitEvent(wevent, PTHREAD_PROCESS_PRIVATE))
+			return wevent;
 
-	if (pthread_cond_init(&wevent->cond, NULL))
-		goto fail_after_mutex_init;
-
-	return wevent;
-
-fail_after_alloc:
-	free(wevent);
-fail_after_mutex_init:
-	pthread_mutex_destroy(&wevent->mutex);
+		free(wevent);
+	}
 
 	return NULL;
 }
@@ -44,7 +84,9 @@ DestroyWaitEvent(wait_event_t *wevent)
 {
 	pthread_mutex_destroy(&wevent->mutex);
 	pthread_cond_destroy(&wevent->cond);
-	free(wevent);
+
+	if (wevent->free_mem)
+		free(wevent);
 }
 
 int
