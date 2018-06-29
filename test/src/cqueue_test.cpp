@@ -6,33 +6,35 @@
 
 TEST_CASE("Basic Test", "[cqueue]")
 {
-	cqueue_mpsc_t *mpsc          = CreateMPSCQueue(3, 1);
+	cqueue_mpmc_t *mpmc          = CreateMPMCQueue(3, 1);
 	std::vector<void *> pointers = { as_ptr(0x00), as_ptr(0x02), as_ptr(0x04) };
 	void *elem;
 
-	REQUIRE(MPSCQueueTryPop(mpsc, &elem) == false);
+	REQUIRE(MPMCQueueTryPop(mpmc, &elem) == false);
 
-	REQUIRE(MPSCQueueTryPush(mpsc, as_ptr(0x00)) == true);
-	REQUIRE(MPSCQueueTryPush(mpsc, as_ptr(0x02)) == true);
-	REQUIRE(MPSCQueueTryPush(mpsc, as_ptr(0x04)) == true);
+	REQUIRE(MPMCQueueTryPush(mpmc, as_ptr(0x00)) == true);
+	REQUIRE(MPMCQueueTryPush(mpmc, as_ptr(0x02)) == true);
+	REQUIRE(MPMCQueueTryPush(mpmc, as_ptr(0x04)) == true);
 
-	REQUIRE(MPSCQueueTryPush(mpsc, as_ptr(0x06)) == false);
+	REQUIRE(MPMCQueueTryPush(mpmc, as_ptr(0x06)) == false);
 
 	elem = NULL;
-	REQUIRE(MPSCQueueTryPop(mpsc, &elem) == true);
+	REQUIRE(MPMCQueueTryPop(mpmc, &elem) == true);
 	REQUIRE(elem == as_ptr(0x00));
 
-	REQUIRE(MPSCQueueTryPush(mpsc, as_ptr(0x06)) == true);
+	REQUIRE(MPMCQueueTryPush(mpmc, as_ptr(0x06)) == true);
 
 	elem = NULL;
-	REQUIRE(MPSCQueueTryPop(mpsc, &elem) == true);
+	REQUIRE(MPMCQueueTryPop(mpmc, &elem) == true);
 	REQUIRE(elem == as_ptr(0x02));
 
 	elem = NULL;
-	REQUIRE(MPSCQueueTryPop(mpsc, &elem) == true);
+	REQUIRE(MPMCQueueTryPop(mpmc, &elem) == true);
 	REQUIRE(elem == as_ptr(0x04));
 
 	elem = NULL;
-	REQUIRE(MPSCQueueTryPop(mpsc, &elem) == true);
+	REQUIRE(MPMCQueueTryPop(mpmc, &elem) == true);
 	REQUIRE(elem == as_ptr(0x06));
+
+	DestroyMPMCQueue(mpmc);
 }

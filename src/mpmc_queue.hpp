@@ -1,27 +1,30 @@
+#ifndef MPMC_QUEUE_HPP
+#define MPMC_QUEUE_HPP
+
 #include "cqueue.h"
 #include "wait_event/wait_event.h"
 
 #include <functional>
 #include <memory>
 
-class cqueue_t
+class mpmc_queue_t
 {
 private:
-	cqueue_mpsc_t *mpsc;
+	cqueue_mpmc_t *mpmc;
 	wait_event_t *producer_wait_event;
 	wait_event_t *consumer_wait_event;
 
 public:
-	cqueue_t(int queue_size, int max_threads)
-	    : mpsc(CreateMPSCQueue(queue_size, max_threads))
+	mpmc_queue_t(int queue_size, int max_threads)
+	    : mpmc(CreateMPMCQueue(queue_size, max_threads))
 	    , producer_wait_event(CreateWaitEvent())
 	    , consumer_wait_event(CreateWaitEvent())
 	{
 	}
 
-	~cqueue_t()
+	~mpmc_queue_t()
 	{
-		DestroyMPSCQueue(mpsc);
+		DestroyMPMCQueue(mpmc);
 		DestroyWaitEvent(producer_wait_event);
 		DestroyWaitEvent(consumer_wait_event);
 	}
@@ -29,25 +32,25 @@ public:
 	bool
 	try_push(void *elem)
 	{
-		return MPSCQueueTryPush(mpsc, elem);
+		return MPMCQueueTryPush(mpmc, elem);
 	}
 
 	bool
 	try_pop(void *&elem)
 	{
-		return MPSCQueueTryPop(mpsc, &elem);
+		return MPMCQueueTryPop(mpmc, &elem);
 	}
 
 	bool
 	is_empty() const
 	{
-		return MPSCQueueIsEmpty(mpsc);
+		return MPMCQueueIsEmpty(mpmc);
 	}
 
 	bool
 	is_full() const
 	{
-		return MPSCQueueIsFull(mpsc);
+		return MPMCQueueIsFull(mpmc);
 	}
 
 	int
@@ -101,3 +104,5 @@ private:
 		return predicate();
 	}
 };
+
+#endif /* MPMC_QUEUE_HPP */

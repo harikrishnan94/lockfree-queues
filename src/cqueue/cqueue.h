@@ -8,18 +8,18 @@ extern "C"
 
 #include <stdbool.h>
 
-	/******** MPSC Queue *********/
-	struct cqueue_mpsc_s;
-	typedef struct cqueue_mpsc_s cqueue_mpsc_t;
+	/******** MPMC Queue *********/
+	struct cqueue_mpmc_s;
+	typedef struct cqueue_mpmc_s cqueue_mpmc_t;
 
-	extern cqueue_mpsc_t *CreateMPSCQueue(int queue_size, int max_threads);
-	extern void DestroyMPSCQueue(cqueue_mpsc_t *mpsc);
+	extern cqueue_mpmc_t *CreateMPMCQueue(int queue_size, int max_threads);
+	extern void DestroyMPMCQueue(cqueue_mpmc_t *mpmc);
 
-	extern bool MPSCQueueTryPush(cqueue_mpsc_t *mpsc, void *elem);
-	extern bool MPSCQueueTryPop(cqueue_mpsc_t *mpsc, void **elem_out);
+	extern bool MPMCQueueTryPush(cqueue_mpmc_t *mpmc, void *elem);
+	extern bool MPMCQueueTryPop(cqueue_mpmc_t *mpmc, void **elem_out);
 
-	extern bool MPSCQueueIsEmpty(cqueue_mpsc_t *mpsc);
-	extern bool MPSCQueueIsFull(cqueue_mpsc_t *mpsc);
+	extern bool MPMCQueueIsEmpty(cqueue_mpmc_t *mpmc);
+	extern bool MPMCQueueIsFull(cqueue_mpmc_t *mpmc);
 
 #ifdef __cplusplus
 }

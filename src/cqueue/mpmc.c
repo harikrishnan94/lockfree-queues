@@ -20,7 +20,7 @@ struct thread_pos_t
 	atomic_long tail;
 };
 
-struct cqueue_mpsc_s
+struct cqueue_mpmc_s
 {
 	atomic_pointer *queue_data;
 	int queue_size;
@@ -40,183 +40,183 @@ struct cqueue_mpsc_s
 #define LOAD_ACQUIRE(aptr) atomic_load_explicit((aptr), memory_order_acquire)
 #define LOAD_RELAXED(aptr) atomic_load_explicit((aptr), memory_order_relaxed)
 
-#define SET_HEAD_POS(mpsc, _head) STORE_RELEASE(&(mpsc)->tpos[get_tid()].head, (_head))
-#define SET_TAIL_POS(mpsc, _tail) STORE_RELEASE(&(mpsc)->tpos[get_tid()].tail, (_tail))
+#define SET_HEAD_POS(mpmc, _head) STORE_RELEASE(&(mpmc)->tpos[get_tid()].head, (_head))
+#define SET_TAIL_POS(mpmc, _tail) STORE_RELEASE(&(mpmc)->tpos[get_tid()].tail, (_tail))
 
 static int get_tid(void);
 static bool queue_is_empty(long head, long tail);
 static bool queue_is_full(long head, long tail, long max);
 
-cqueue_mpsc_t *
-CreateMPSCQueue(int queue_size, int max_threads)
+cqueue_mpmc_t *
+CreateMPMCQueue(int queue_size, int max_threads)
 {
-	cqueue_mpsc_t *mpsc = malloc(sizeof(struct cqueue_mpsc_s));
+	cqueue_mpmc_t *mpmc = malloc(sizeof(struct cqueue_mpmc_s));
 
-	mpsc->queue_data  = malloc(sizeof(atomic_pointer) * queue_size);
-	mpsc->queue_size  = queue_size;
-	mpsc->max_threads = max_threads;
-	mpsc->tpos        = malloc(sizeof(struct thread_pos_t) * max_threads);
+	mpmc->queue_data  = malloc(sizeof(atomic_pointer) * queue_size);
+	mpmc->queue_size  = queue_size;
+	mpmc->max_threads = max_threads;
+	mpmc->tpos        = malloc(sizeof(struct thread_pos_t) * max_threads);
 
-	atomic_init(&mpsc->head, 0);
-	atomic_init(&mpsc->tail, 0);
-	atomic_init(&mpsc->last_head, 0);
-	atomic_init(&mpsc->last_tail, 0);
+	atomic_init(&mpmc->head, 0);
+	atomic_init(&mpmc->tail, 0);
+	atomic_init(&mpmc->last_head, 0);
+	atomic_init(&mpmc->last_tail, 0);
 
 	for (int i = 0; i < max_threads; i++)
 	{
-		mpsc->tpos[i].head = LONG_MAX;
-		mpsc->tpos[i].tail = LONG_MAX;
+		mpmc->tpos[i].head = LONG_MAX;
+		mpmc->tpos[i].tail = LONG_MAX;
 	}
 
-	return mpsc;
+	return mpmc;
 }
 
 void
-DestroyMPSCQueue(cqueue_mpsc_t *mpsc)
+DestroyMPMCQueue(cqueue_mpmc_t *mpmc)
 {
-	free(mpsc->queue_data);
-	free(mpsc);
+	free(mpmc->queue_data);
+	free(mpmc);
 }
 
 static void
-update_last_tail(cqueue_mpsc_t *mpsc)
+update_last_tail(cqueue_mpmc_t *mpmc)
 {
-	long last_tail = LOAD_ACQUIRE(&mpsc->tail);
+	long last_tail = LOAD_ACQUIRE(&mpmc->tail);
 
-	for (int i = 0; i < mpsc->max_threads; i++)
+	for (int i = 0; i < mpmc->max_threads; i++)
 	{
-		long tail = LOAD_ACQUIRE(&mpsc->tpos[i].tail);
+		long tail = LOAD_ACQUIRE(&mpmc->tpos[i].tail);
 
 		if (tail < last_tail)
 			last_tail = tail;
 	}
 
-	STORE_RELEASE(&mpsc->last_tail, last_tail);
+	STORE_RELEASE(&mpmc->last_tail, last_tail);
 }
 
 static void
-update_last_head(cqueue_mpsc_t *mpsc)
+update_last_head(cqueue_mpmc_t *mpmc)
 {
-	long last_head = LOAD_ACQUIRE(&mpsc->head);
+	long last_head = LOAD_ACQUIRE(&mpmc->head);
 
-	for (int i = 0; i < mpsc->max_threads; i++)
+	for (int i = 0; i < mpmc->max_threads; i++)
 	{
-		long head = LOAD_ACQUIRE(&mpsc->tpos[i].head);
+		long head = LOAD_ACQUIRE(&mpmc->tpos[i].head);
 
 		if (head < last_head)
 			last_head = head;
 	}
 
-	STORE_RELEASE(&mpsc->last_head, last_head);
+	STORE_RELEASE(&mpmc->last_head, last_head);
 }
 
 static long
-reserve_head_to_produce(cqueue_mpsc_t *mpsc, bool try_again)
+reserve_head_to_produce(cqueue_mpmc_t *mpmc, bool try_again)
 {
-	int queue_size = mpsc->queue_size;
-	long head      = LOAD_ACQUIRE(&mpsc->head);
-	long last_tail = LOAD_ACQUIRE(&mpsc->last_tail);
+	int queue_size = mpmc->queue_size;
+	long head      = LOAD_ACQUIRE(&mpmc->head);
+	long last_tail = LOAD_ACQUIRE(&mpmc->last_tail);
 	backoff_t boff;
 
 	backoff_init(&boff, 10, 1000);
 
 	while (!queue_is_full(head, last_tail, queue_size))
 	{
-		SET_HEAD_POS(mpsc, head);
+		SET_HEAD_POS(mpmc, head);
 
-		if (atomic_compare_exchange_strong(&mpsc->head, &head, head + 1))
+		if (atomic_compare_exchange_strong(&mpmc->head, &head, head + 1))
 			return head;
 
 		usleep(backoff_do_eb(&boff));
 	}
 
 	if (try_again)
-		update_last_tail(mpsc);
+		update_last_tail(mpmc);
 
-	return try_again ? reserve_head_to_produce(mpsc, false) : -1;
+	return try_again ? reserve_head_to_produce(mpmc, false) : -1;
 }
 
 static long
-reserve_tail_to_consume(cqueue_mpsc_t *mpsc, bool try_again)
+reserve_tail_to_consume(cqueue_mpmc_t *mpmc, bool try_again)
 {
-	long last_head = LOAD_ACQUIRE(&mpsc->last_head);
-	long tail      = LOAD_ACQUIRE(&mpsc->tail);
+	long last_head = LOAD_ACQUIRE(&mpmc->last_head);
+	long tail      = LOAD_ACQUIRE(&mpmc->tail);
 	backoff_t boff;
 
 	backoff_init(&boff, 10, 1000);
 
 	while (!queue_is_empty(last_head, tail))
 	{
-		SET_TAIL_POS(mpsc, tail);
+		SET_TAIL_POS(mpmc, tail);
 
-		if (atomic_compare_exchange_strong(&mpsc->tail, &tail, tail + 1))
+		if (atomic_compare_exchange_strong(&mpmc->tail, &tail, tail + 1))
 			return tail;
 
 		usleep(backoff_do_eb(&boff));
 	}
 
 	if (try_again)
-		update_last_head(mpsc);
+		update_last_head(mpmc);
 
-	return try_again ? reserve_tail_to_consume(mpsc, false) : -1;
+	return try_again ? reserve_tail_to_consume(mpmc, false) : -1;
 }
 
 bool
-MPSCQueueTryPush(cqueue_mpsc_t *mpsc, void *elem)
+MPMCQueueTryPush(cqueue_mpmc_t *mpmc, void *elem)
 {
-	long head     = reserve_head_to_produce(mpsc, true);
+	long head     = reserve_head_to_produce(mpmc, true);
 	bool did_push = false;
 
 	if (head >= 0)
 	{
 		did_push = true;
-		STORE_RELAXED(mpsc->queue_data + head % mpsc->queue_size, elem);
+		STORE_RELAXED(mpmc->queue_data + head % mpmc->queue_size, elem);
 	}
 
-	SET_HEAD_POS(mpsc, LONG_MAX);
+	SET_HEAD_POS(mpmc, LONG_MAX);
 
 	return did_push;
 }
 
 bool
-MPSCQueueTryPop(cqueue_mpsc_t *mpsc, void **elem_out)
+MPMCQueueTryPop(cqueue_mpmc_t *mpmc, void **elem_out)
 {
-	long tail    = reserve_tail_to_consume(mpsc, true);
+	long tail    = reserve_tail_to_consume(mpmc, true);
 	bool did_pop = false;
 
 	if (tail >= 0)
 	{
 		did_pop   = true;
-		*elem_out = LOAD_RELAXED(mpsc->queue_data + tail % mpsc->queue_size);
+		*elem_out = LOAD_RELAXED(mpmc->queue_data + tail % mpmc->queue_size);
 	}
 
-	SET_TAIL_POS(mpsc, LONG_MAX);
+	SET_TAIL_POS(mpmc, LONG_MAX);
 
 	return did_pop;
 }
 
 bool
-MPSCQueueIsEmpty(cqueue_mpsc_t *mpsc)
+MPMCQueueIsEmpty(cqueue_mpmc_t *mpmc)
 {
-	if (queue_is_empty(LOAD_ACQUIRE(&mpsc->last_head), LOAD_ACQUIRE(&mpsc->tail)))
-		update_last_head(mpsc);
+	if (queue_is_empty(LOAD_ACQUIRE(&mpmc->last_head), LOAD_ACQUIRE(&mpmc->tail)))
+		update_last_head(mpmc);
 	else
 		return false;
 
-	return queue_is_empty(LOAD_ACQUIRE(&mpsc->last_head), LOAD_ACQUIRE(&mpsc->tail));
+	return queue_is_empty(LOAD_ACQUIRE(&mpmc->last_head), LOAD_ACQUIRE(&mpmc->tail));
 }
 
 bool
-MPSCQueueIsFull(cqueue_mpsc_t *mpsc)
+MPMCQueueIsFull(cqueue_mpmc_t *mpmc)
 {
-	if (queue_is_full(LOAD_ACQUIRE(&mpsc->head), LOAD_ACQUIRE(&mpsc->last_tail), mpsc->queue_size))
-		update_last_tail(mpsc);
+	if (queue_is_full(LOAD_ACQUIRE(&mpmc->head), LOAD_ACQUIRE(&mpmc->last_tail), mpmc->queue_size))
+		update_last_tail(mpmc);
 	else
 		return false;
 
-	return queue_is_full(LOAD_ACQUIRE(&mpsc->head),
-	                     LOAD_ACQUIRE(&mpsc->last_tail),
-	                     mpsc->queue_size);
+	return queue_is_full(LOAD_ACQUIRE(&mpmc->head),
+	                     LOAD_ACQUIRE(&mpmc->last_tail),
+	                     mpmc->queue_size);
 }
 
 static bool

@@ -3,7 +3,7 @@ project(cqueue_bench)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(SOURCE_FILES bench.cpp)
+set(SOURCE_FILES mpmc_queue.hpp bench.cpp)
 
 add_subdirectory(cqueue)
 
@@ -13,3 +13,4 @@ add_executable(cqueue_bench ${SOURCE_FILES})
 target_link_libraries(cqueue_bench cqueue)
 
 install(TARGETS cqueue_bench DESTINATION bin)
+install(FILES mpmc_queue.hpp DESTINATION include/cqueue)

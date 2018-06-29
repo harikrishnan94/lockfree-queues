@@ -5,7 +5,7 @@
 #include <thread>
 #include <vector>
 
-#include "mpsc_queue.hpp"
+#include "mpmc_queue.hpp"
 
 #define as_ptr(x) (reinterpret_cast<void *>(x))
 #define as_int(x) (reinterpret_cast<uintptr_t>(x))
@@ -13,7 +13,7 @@
 std::mutex m;
 
 static void
-cqueue_consume_worker(cqueue_t &mpsc,
+cqueue_consume_worker(mpmc_queue_t &mpmc,
                       std::vector<uintptr_t> &out,
                       std::atomic_int &num_consumed,
                       int total_items)
@@ -23,21 +23,21 @@ cqueue_consume_worker(cqueue_t &mpsc,
 
 	using namespace std::literals::chrono_literals;
 
-	auto pred = [&num_consumed, total_items, &mpsc]() {
+	auto pred = [&num_consumed, total_items, &mpmc]() {
 		if (num_consumed >= total_items)
 			return true;
 
-		return !mpsc.is_empty();
+		return !mpmc.is_empty();
 	};
 
 	while (num_consumed < total_items)
 	{
 		void *elem;
 
-		if (mpsc.try_pop(elem))
+		if (mpmc.try_pop(elem))
 		{
 			out.emplace_back(as_int(elem));
-			mpsc.wakeup_one_producer();
+			mpmc.wakeup_one_producer();
 			local_consumed++;
 		}
 		else
@@ -45,13 +45,13 @@ cqueue_consume_worker(cqueue_t &mpsc,
 			num_consumed += local_consumed;
 			local_consumed = 0;
 
-			mpsc.consumer_wait(pred);
+			mpmc.consumer_wait(pred);
 			num_times_waited++;
 		}
 	}
 
-	mpsc.wakeup_all_producers();
-	mpsc.wakeup_all_consumers();
+	mpmc.wakeup_all_producers();
+	mpmc.wakeup_all_consumers();
 
 	m.lock();
 	std::cout << "Consumer Num times waited: " << num_times_waited << std::endl;
@@ -59,26 +59,26 @@ cqueue_consume_worker(cqueue_t &mpsc,
 }
 
 static void
-cqueue_produce_worker(cqueue_t &mpsc, std::vector<uintptr_t> &in)
+cqueue_produce_worker(mpmc_queue_t &mpmc, std::vector<uintptr_t> &in)
 {
 	int num_times_waited = 0;
 
 	using namespace std::literals::chrono_literals;
 
-	auto pred = [&mpsc]() { return !mpsc.is_full(); };
+	auto pred = [&mpmc]() { return !mpmc.is_full(); };
 
 	for (auto &elem : in)
 	{
-		while (!mpsc.try_push(as_ptr(elem)))
+		while (!mpmc.try_push(as_ptr(elem)))
 		{
-			mpsc.producer_wait(pred);
+			mpmc.producer_wait(pred);
 			num_times_waited++;
 		}
 
-		mpsc.wakeup_one_consumer();
+		mpmc.wakeup_one_consumer();
 	}
 
-	mpsc.wakeup_all_consumers();
+	mpmc.wakeup_all_consumers();
 
 	m.lock();
 	std::cout << "Produer Num times waited: " << num_times_waited << std::endl;
@@ -86,7 +86,7 @@ cqueue_produce_worker(cqueue_t &mpsc, std::vector<uintptr_t> &in)
 }
 
 static void
-start_consumers(cqueue_t &mpsc,
+start_consumers(mpmc_queue_t &mpmc,
                 int total_items,
                 std::vector<uintptr_t> *outs,
                 int num_consumers,
@@ -96,7 +96,7 @@ start_consumers(cqueue_t &mpsc,
 	for (int i = 0; i < num_consumers; i++)
 	{
 		consumers.emplace_back(std::thread{ cqueue_consume_worker,
-		                                    std::ref(mpsc),
+		                                    std::ref(mpmc),
 		                                    std::ref(outs[i]),
 		                                    std::ref(num_consumed),
 		                                    total_items });
@@ -104,7 +104,7 @@ start_consumers(cqueue_t &mpsc,
 }
 
 static void
-start_producers(cqueue_t &mpsc,
+start_producers(mpmc_queue_t &mpmc,
                 std::vector<uintptr_t> *ins,
                 int num_producers,
                 std::vector<std::thread> &producers)
@@ -112,7 +112,7 @@ start_producers(cqueue_t &mpsc,
 	for (int i = 0; i < num_producers; i++)
 	{
 		producers.emplace_back(
-		    std::thread{ cqueue_produce_worker, std::ref(mpsc), std::ref(ins[i]) });
+		    std::thread{ cqueue_produce_worker, std::ref(mpmc), std::ref(ins[i]) });
 	}
 }
 
@@ -148,7 +148,7 @@ main(int argc, char *argv[])
 	auto ins  = std::make_unique<std::vector<uintptr_t>[]>(num_producers);
 	auto outs = std::make_unique<std::vector<uintptr_t>[]>(num_consumers);
 	std::vector<std::thread> producers, consumers;
-	cqueue_t mpsc{ queue_size, num_producers + num_consumers };
+	mpmc_queue_t mpmc{ queue_size, num_producers + num_consumers };
 	std::atomic_int num_consumed{ 0 };
 
 	for (int i = 0; i < num_producers; i++)
@@ -156,8 +156,8 @@ main(int argc, char *argv[])
 
 	auto start = std::chrono::system_clock::now();
 
-	start_producers(mpsc, ins.get(), num_producers, producers);
-	start_consumers(mpsc,
+	start_producers(mpmc, ins.get(), num_producers, producers);
+	start_consumers(mpmc,
 	                num_times * num_producers,
 	                outs.get(),
 	                num_consumers,
