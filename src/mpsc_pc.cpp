@@ -3,6 +3,7 @@
 #include "lockfree-queue/mpsc_pc.h"
 #include "rseq.h"
 
+#define NO_SANITIZE(type) __attribute__((no_sanitize(#type)))
 
 namespace lockfree
 {
@@ -130,6 +131,7 @@ namespace lockfree
 .endm
 )");
 
+	NO_SANITIZE(address) NO_SANITIZE(thread) NO_SANITIZE(undefined)
 	auto MPSCPCQueueAny::TryPush(const void* elem, size_type elemsize) noexcept -> bool
 	{
 		static thread_local const auto* cs = create_crit_section();
