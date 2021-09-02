@@ -1,0 +1,12 @@
+{
+    "cmake.buildDirectory": "${env:HOME}/build",
+    "cmake.environment": {
+        "VCPKG_ROOT": "${env:HOME}/vcpkg"
+    },
+    "cmake.configureArgs": [
+        "-DCMAKE_TOOLCHAIN_FILE=${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "-DCMAKE_INSTALL_PREFIX=${env:HOME}/.local"
+    ],
+    "clangd.path": "clangd-12",
+    "C_Cpp.intelliSenseEngine": "Disabled"
+}

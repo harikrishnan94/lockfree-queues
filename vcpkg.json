@@ -1,0 +1,9 @@
+{
+    "name": "lockfree-queue",
+    "version-string": "0.1",
+    "dependencies": [
+        "boost-interprocess",
+        "boost-align",
+        "doctest"
+    ]
+}
