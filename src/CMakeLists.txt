@@ -8,7 +8,7 @@ include(PackableLibrary)
 add_packable_library(
     ${LIB_NAME}
     NAMESPACE
-    IMC
+    lockfree-queue
     ROOT_INCLUDE_DIR
     ${INCLUDE_DIR}
     INTERFACE_INCLUDE_DIRS
