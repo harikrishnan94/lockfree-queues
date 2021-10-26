@@ -35,11 +35,12 @@ auto RestartableSequence::Available() noexcept -> bool
 	switch (errno)
 	{
 	case ENOSYS:
+	case EPERM:
 		return false;
 	case EINVAL:
 		return true;
 	default:
-		std::fprintf(stderr, "rseq syscall returns unexpected error.\n"); // NOLINT
+		std::perror("rseq");
 		abort();
 	}
 }
